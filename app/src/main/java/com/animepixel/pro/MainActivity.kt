@@ -1,10 +1,11 @@
 package com.animepixel.pro
+import androidx.compose.animation.core.*
 
+import android.net.Uri
 import android.os.Bundle
+import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -19,9 +20,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
+import androidx.compose.ui.viewinterop.AndroidView
 
 private val Bg = Color(0xFF090711)
 private val Surface = Color(0xFF171326)
@@ -40,7 +45,16 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private data class Wallpaper(val id: Int, val title: String, val category: String, val colors: List<Color>, val tag: String)
+private data class Wallpaper(
+    val id: Int,
+    val title: String,
+    val category: String,
+    val colors: List<Color>,
+    val tag: String,
+    val videoRes: Int? = null,
+    val posterRes: Int? = null
+)
+
 private val wallpapers = listOf(
     Wallpaper(1, "Neon Ronin", "Action", listOf(Color(0xFF25104C), Color(0xFF9B36D8), Color(0xFF111827)), "4K"),
     Wallpaper(2, "Moonlit Sakura", "Nature", listOf(Color(0xFF401C5C), Color(0xFFDF76B8), Color(0xFF17152F)), "4K"),
@@ -49,7 +63,11 @@ private val wallpapers = listOf(
     Wallpaper(5, "Silent Horizon", "Nature", listOf(Color(0xFF153A55), Color(0xFF6C85C8), Color(0xFF17152F)), "HD"),
     Wallpaper(6, "Shadow Blade", "Action", listOf(Color(0xFF101827), Color(0xFF5B3CA6), Color(0xFF090711)), "4K"),
     Wallpaper(7, "Dream Galaxy", "Fantasy", listOf(Color(0xFF22104A), Color(0xFF4C6ACB), Color(0xFFB45CBA)), "4K"),
-    Wallpaper(8, "Tokyo Pulse", "Cyberpunk", listOf(Color(0xFF35103D), Color(0xFFE43D83), Color(0xFF14213D)), "HD")
+    Wallpaper(8, "Tokyo Pulse", "Cyberpunk", listOf(Color(0xFF35103D), Color(0xFFE43D83), Color(0xFF14213D)), "HD"),
+    Wallpaper(9, "Wolf • Crimson Storm", "Action", listOf(Color(0xFF071B35), Color(0xFF1E5C9A), Color(0xFF6B142D)), "LIVE", R.raw.wolf_blue_red, R.drawable.wolf_poster_1),
+    Wallpaper(10, "Wolf • Neon Halo", "Fantasy", listOf(Color(0xFF17133D), Color(0xFF3559A8), Color(0xFF9B3B7D)), "LIVE", R.raw.wolf_neon_halo, R.drawable.wolf_poster_2),
+    Wallpaper(11, "Wolf • Ember Spirit", "Fantasy", listOf(Color(0xFF4A1D12), Color(0xFFFF7A27), Color(0xFF25245E)), "LIVE", R.raw.wolf_ember_blue, R.drawable.wolf_poster_3),
+    Wallpaper(12, "Wolf • Electric Close-up", "Action", listOf(Color(0xFF071B35), Color(0xFF1E5C9A), Color(0xFF6B142D)), "LIVE", R.raw.wolf_blue_red_closeup, R.drawable.wolf_poster_4)
 )
 
 @Composable
@@ -64,8 +82,8 @@ private fun AnimePixelApp() {
     var selectedEffect by remember { mutableStateOf("Petals") }
     val filtered = wallpapers.filter { w ->
         (tab != "Favorites" || w.id in favorites) &&
-        (category == "All" || w.category == category) &&
-        (query.isBlank() || w.title.contains(query, true) || w.category.contains(query, true))
+            (category == "All" || w.category == category) &&
+            (query.isBlank() || w.title.contains(query, true) || w.category.contains(query, true))
     }
     MaterialTheme(colorScheme = darkColorScheme(background = Bg, surface = Surface, primary = Purple)) {
         Scaffold(containerColor = Bg, bottomBar = {
@@ -103,9 +121,9 @@ private fun AnimePixelApp() {
                     }
                 }
             }
-        }
-        selected?.let { w ->
-            WallpaperDetail(w, w.id in favorites, { favorites = if (w.id in favorites) favorites - w.id else favorites + w.id }, { selected = null })
+            selected?.let { w ->
+                WallpaperDetail(w, w.id in favorites, { favorites = if (w.id in favorites) favorites - w.id else favorites + w.id }, { selected = null })
+            }
         }
     }
 }
@@ -154,14 +172,19 @@ private fun AnimePixelApp() {
 @Composable private fun WallpaperCard(w: Wallpaper, favorite: Boolean, onFavorite: () -> Unit, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Surface).clickable(onClick = onClick).border(1.dp, Color(0xFF2B223C), RoundedCornerShape(18.dp))) {
         Box(Modifier.fillMaxWidth().height(190.dp).background(Brush.linearGradient(w.colors))) {
-            WallpaperArt(w)
-            Text(w.tag, Modifier.align(Alignment.TopStart).padding(9.dp).clip(RoundedCornerShape(7.dp)).background(Color.Black.copy(alpha = .45f)).padding(horizontal = 8.dp, vertical = 4.dp), color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            if (w.posterRes != null) {
+                Image(painterResource(w.posterRes), contentDescription = w.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else {
+                WallpaperArt(w)
+            }
+            Text(w.tag, Modifier.align(Alignment.TopStart).padding(9.dp).clip(RoundedCornerShape(7.dp)).background(if (w.videoRes != null) Purple.copy(alpha = .9f) else Color.Black.copy(alpha = .45f)).padding(horizontal = 8.dp, vertical = 4.dp), color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            if (w.videoRes != null) Icon(Icons.Default.PlayCircleFilled, null, Modifier.align(Alignment.Center).size(42.dp), tint = Color.White.copy(alpha = .92f))
             IconButton(onClick = onFavorite, modifier = Modifier.align(Alignment.TopEnd).padding(5.dp).size(34.dp).background(Color.Black.copy(alpha = .4f), CircleShape)) { Icon(if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (favorite) Pink else Color.White, modifier = Modifier.size(18.dp)) }
             Icon(Icons.Default.OpenInFull, null, Modifier.align(Alignment.BottomEnd).padding(10.dp).size(17.dp), tint = Color.White.copy(alpha = .8f))
         }
         Column(Modifier.padding(horizontal = 11.dp, vertical = 9.dp)) {
             Text(w.title, color = TextMain, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(w.category.uppercase(), color = TextMuted, fontSize = 9.sp, letterSpacing = 1.sp)
+            Text(if (w.videoRes != null) "ANIMATED VIDEO • TAP TO PLAY" else w.category.uppercase(), color = TextMuted, fontSize = 9.sp, letterSpacing = 1.sp)
         }
     }
 }
@@ -179,12 +202,35 @@ private fun AnimePixelApp() {
     }
 }
 
+@Composable private fun VideoWallpaperPreview(videoRes: Int, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val videoView = remember(videoRes) {
+        VideoView(context).apply {
+            setVideoURI(Uri.parse("android.resource://${context.packageName}/$videoRes"))
+            setOnPreparedListener { player ->
+                player.isLooping = true
+                player.setVolume(0f, 0f)
+                start()
+            }
+        }
+    }
+    DisposableEffect(videoView) {
+        onDispose { videoView.stopPlayback() }
+    }
+    AndroidView(factory = { videoView }, modifier = modifier)
+}
+
 @Composable private fun WallpaperDetail(w: Wallpaper, favorite: Boolean, onFavorite: () -> Unit, onClose: () -> Unit) {
     AlertDialog(onDismissRequest = onClose, containerColor = Surface, title = { Text(w.title, color = TextMain, fontWeight = FontWeight.Bold) }, text = {
         Column {
-            Box(Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(18.dp)).background(Brush.linearGradient(w.colors))) { WallpaperArt(w) }
-            Spacer(Modifier.height(12.dp)); Text("${w.category}  •  ${w.tag}", color = TextMuted)
-            Text("Preview artwork is a design placeholder. Connect a licensed wallpaper source to serve real downloadable 4K images.", color = TextMuted, fontSize = 12.sp)
+            if (w.videoRes != null) {
+                VideoWallpaperPreview(w.videoRes, Modifier.fillMaxWidth().height(300.dp).clip(RoundedCornerShape(18.dp)).background(Color.Black))
+            } else {
+                Box(Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(18.dp)).background(Brush.linearGradient(w.colors))) { WallpaperArt(w) }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(if (w.videoRes != null) "${w.category}  •  LOOPING VIDEO PREVIEW" else "${w.category}  •  ${w.tag}", color = TextMuted)
+            Text(if (w.videoRes != null) "Your uploaded wolf animation is playing in a silent loop. Tap Close to stop playback." else "Preview artwork is a design placeholder. Connect a licensed wallpaper source to serve real downloadable 4K images.", color = TextMuted, fontSize = 12.sp)
         }
     }, confirmButton = { TextButton(onClick = onFavorite) { Text(if (favorite) "Remove favorite" else "Add favorite", color = Purple) } }, dismissButton = { TextButton(onClick = onClose) { Text("Close", color = TextMuted) } })
 }
@@ -228,7 +274,7 @@ private fun AnimePixelApp() {
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF211632)), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp)) { Text("GO PREMIUM", color = Color(0xFFFFD27A), fontWeight = FontWeight.Black); Text("Unlock exclusive collections and an ad-free experience.", color = TextMuted, fontSize = 12.sp); Button(onClick = {}, modifier = Modifier.padding(top = 10.dp), colors = ButtonDefaults.buttonColors(containerColor = Purple)) { Text("Explore Premium") } }
         }
-        Spacer(Modifier.height(20.dp)); Text("AnimePixel Pro • Starter UI • v1.1.0", color = TextMuted, fontSize = 10.sp)
+        Spacer(Modifier.height(20.dp)); Text("AnimePixel Pro • Wolf Video Update • v1.2.0", color = TextMuted, fontSize = 10.sp)
     }
 }
 
