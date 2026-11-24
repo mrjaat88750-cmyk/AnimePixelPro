@@ -1,13 +1,10 @@
 name: AnimePixel Pro Android Build
-
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
-
 permissions:
   contents: read
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,7 +15,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '17'
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:

@@ -3,264 +3,238 @@ package com.animepixel.pro
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.*
+import androidx.compose.ui.draw.*
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.*
 
-private val Bg = Color(0xFF090A12)
-private val Panel = Color(0xFF171927)
-private val Purple = Color(0xFF9B72FF)
-private val Muted = Color(0xFF9DA2B7)
+private val Bg = Color(0xFF090711)
+private val Surface = Color(0xFF171326)
+private val Purple = Color(0xFF9B5CFF)
+private val Blue = Color(0xFF35B8FF)
+private val Pink = Color(0xFFFF4FA3)
+private val TextMain = Color(0xFFF7F2FF)
+private val TextMuted = Color(0xFFAAA1BE)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = android.graphics.Color.rgb(9, 7, 17)
+        window.navigationBarColor = android.graphics.Color.rgb(9, 7, 17)
         setContent { AnimePixelApp() }
     }
 }
 
-private data class Wallpaper(val title: String, val tag: String, val colors: List<Color>)
+private data class Wallpaper(val id: Int, val title: String, val category: String, val colors: List<Color>, val tag: String)
 private val wallpapers = listOf(
-    Wallpaper("Shadow Hunter", "TRENDING", listOf(Color(0xFF101D49), Color(0xFF6D42C8))),
-    Wallpaper("Neon Samurai", "4K AMOLED", listOf(Color(0xFF3A123F), Color(0xFFE34C83))),
-    Wallpaper("Moonlight Anime", "NEW", listOf(Color(0xFF092F43), Color(0xFF4B9BB8))),
-    Wallpaper("Crimson Warrior", "POPULAR", listOf(Color(0xFF4A171D), Color(0xFFDA694A)))
+    Wallpaper(1, "Neon Ronin", "Action", listOf(Color(0xFF25104C), Color(0xFF9B36D8), Color(0xFF111827)), "4K"),
+    Wallpaper(2, "Moonlit Sakura", "Nature", listOf(Color(0xFF401C5C), Color(0xFFDF76B8), Color(0xFF17152F)), "4K"),
+    Wallpaper(3, "Cyber City", "Cyberpunk", listOf(Color(0xFF071D42), Color(0xFF087EAB), Color(0xFF231044)), "HD"),
+    Wallpaper(4, "Spirit Flame", "Fantasy", listOf(Color(0xFF4A142D), Color(0xFFFF743B), Color(0xFF20112F)), "4K"),
+    Wallpaper(5, "Silent Horizon", "Nature", listOf(Color(0xFF153A55), Color(0xFF6C85C8), Color(0xFF17152F)), "HD"),
+    Wallpaper(6, "Shadow Blade", "Action", listOf(Color(0xFF101827), Color(0xFF5B3CA6), Color(0xFF090711)), "4K"),
+    Wallpaper(7, "Dream Galaxy", "Fantasy", listOf(Color(0xFF22104A), Color(0xFF4C6ACB), Color(0xFFB45CBA)), "4K"),
+    Wallpaper(8, "Tokyo Pulse", "Cyberpunk", listOf(Color(0xFF35103D), Color(0xFFE43D83), Color(0xFF14213D)), "HD")
 )
-private val categories = listOf("All", "Trending", "AMOLED", "Live", "Gaming", "Romance", "Dark")
 
 @Composable
 private fun AnimePixelApp() {
     var tab by remember { mutableStateOf("Home") }
-    var category by remember { mutableStateOf("All") }
-    var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf<Wallpaper?>(null) }
-    val favorites = remember { mutableStateListOf<String>() }
-
-    MaterialTheme(colorScheme = darkColorScheme(primary = Purple, background = Bg, surface = Panel)) {
-        Surface(Modifier.fillMaxSize(), color = Bg) {
-            if (selected != null) {
-                WallpaperDetail(selected!!, favorites.contains(selected!!.title),
-                    onBack = { selected = null },
-                    onFavorite = {
-                        val name = selected!!.title
-                        if (favorites.contains(name)) favorites.remove(name) else favorites.add(name)
-                    })
-            } else {
-                Scaffold(containerColor = Bg, bottomBar = {
-                    NavigationBar(containerColor = Color(0xFF111320), contentColor = Color.White) {
-                        val items = listOf("Home" to Icons.Default.Home, "Explore" to Icons.Default.Explore,
-                            "Favorites" to Icons.Default.Favorite, "Settings" to Icons.Default.Settings)
-                        items.forEach { (name, icon) ->
-                            NavigationBarItem(selected = tab == name, onClick = { tab = name },
-                                icon = { Icon(icon, contentDescription = name) },
-                                label = { Text(name, fontSize = 10.sp) },
-                                colors = NavigationBarItemDefaults.colors(selectedIconColor = Purple,
-                                    selectedTextColor = Purple, indicatorColor = Color(0xFF30264C),
-                                    unselectedIconColor = Muted, unselectedTextColor = Muted))
+    var query by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("All") }
+    var favorites by remember { mutableStateOf(setOf<Int>()) }
+    var autoChange by remember { mutableStateOf(false) }
+    var interval by remember { mutableStateOf("Every day") }
+    var selectedEffect by remember { mutableStateOf("Petals") }
+    val filtered = wallpapers.filter { w ->
+        (tab != "Favorites" || w.id in favorites) &&
+        (category == "All" || w.category == category) &&
+        (query.isBlank() || w.title.contains(query, true) || w.category.contains(query, true))
+    }
+    MaterialTheme(colorScheme = darkColorScheme(background = Bg, surface = Surface, primary = Purple)) {
+        Scaffold(containerColor = Bg, bottomBar = {
+            NavigationBar(containerColor = Color(0xFF100D1B), contentColor = TextMuted) {
+                listOf("Home", "Explore", "Favorites", "Studio", "Settings").forEach { name ->
+                    val icon = when (name) {
+                        "Home" -> Icons.Default.Home
+                        "Explore" -> Icons.Default.Explore
+                        "Favorites" -> Icons.Default.Favorite
+                        "Studio" -> Icons.Default.AutoAwesome
+                        else -> Icons.Default.Settings
+                    }
+                    NavigationBarItem(selected = tab == name, onClick = { tab = name }, icon = { Icon(icon, null) }, label = { Text(name, fontSize = 10.sp) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Purple, selectedTextColor = TextMain, indicatorColor = Purple.copy(alpha = .16f), unselectedIconColor = TextMuted, unselectedTextColor = TextMuted))
+                }
+            }
+        }) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                when (tab) {
+                    "Studio" -> MotionStudio(selectedEffect, { selectedEffect = it })
+                    "Settings" -> SettingsScreen(autoChange, { autoChange = it }, interval, { interval = it })
+                    else -> {
+                        Header(tab)
+                        if (tab != "Favorites") SearchBar(query) { query = it }
+                        if (tab == "Home") FeaturedBanner { tab = "Explore" }
+                        CategoryRow(category) { category = it }
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(if (tab == "Favorites") "YOUR COLLECTION" else "${if (tab == "Home") "TRENDING WALLPAPERS" else "EXPLORE WALLPAPERS"}", color = TextMain, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, fontSize = 13.sp)
+                            Text("${filtered.size} wallpapers", color = TextMuted, fontSize = 11.sp)
+                        }
+                        LazyVerticalGrid(columns = GridCells.Fixed(2), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 18.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()) {
+                            items(filtered, key = { it.id }) { wallpaper ->
+                                WallpaperCard(wallpaper, wallpaper.id in favorites, { favorites = if (wallpaper.id in favorites) favorites - wallpaper.id else favorites + wallpaper.id }) { selected = wallpaper }
+                            }
                         }
                     }
-                }) { padding ->
-                    when (tab) {
-                        "Home" -> HomeScreen(padding, category, { category = it }, query, { query = it }, { selected = it })
-                        "Explore" -> ExploreScreen(padding, query, { query = it }, { selected = it })
-                        "Favorites" -> FavoritesScreen(padding, favorites, { title -> wallpapers.find { it.title == title }?.let { selected = it } })
-                        else -> SettingsScreen(padding)
-                    }
                 }
             }
+        }
+        selected?.let { w ->
+            WallpaperDetail(w, w.id in favorites, { favorites = if (w.id in favorites) favorites - w.id else favorites + w.id }, { selected = null })
         }
     }
 }
 
-@Composable
-private fun HomeScreen(padding: PaddingValues, category: String, onCategory: (String) -> Unit,
-                       query: String, onQuery: (String) -> Unit, onSelect: (Wallpaper) -> Unit) {
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 18.dp)) {
-        item { Header() }
-        item { SearchBox(query, onQuery) }
-        item { HeroBanner() }
-        item { SectionTitle("Categories", "See all") }
-        item {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp),
-                horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                categories.forEach { item ->
-                    FilterChip(selected = category == item, onClick = { onCategory(item) }, label = { Text(item) },
-                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF38285D),
-                            selectedLabelColor = Color.White, labelColor = Muted))
-                }
-            }
-        }
-        item { SectionTitle("Trending Wallpapers", "View all") }
-        items(wallpapers.filter { query.isBlank() || it.title.contains(query, true) }) { wallpaper ->
-            WallpaperRow(wallpaper, onSelect)
-        }
-        item { SectionTitle("Made for your screen", "Explore") }
-        item { MotionStudioCard() }
-    }
-}
-
-@Composable
-private fun Header() {
-    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 14.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(42.dp).clip(RoundedCornerShape(14.dp)).background(Brush.linearGradient(listOf(Purple, Color(0xFF3D7BFF)))), contentAlignment = Alignment.Center) {
-            Text("A", color = Color.White, fontWeight = FontWeight.Black, fontSize = 25.sp)
-        }
-        Spacer(Modifier.width(11.dp))
+@Composable private fun Header(tab: String) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(Brush.linearGradient(listOf(Purple, Blue))), contentAlignment = Alignment.Center) { Icon(Icons.Default.Wallpaper, null, tint = Color.White) }
+        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text("AnimePixel Pro", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text("Your screen. Your anime universe.", color = Muted, fontSize = 11.sp)
+            Text("ANIMEPIXEL", color = TextMain, fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 1.5.sp)
+            Text("PRO  •  4K WALLPAPER STUDIO", color = TextMuted, fontSize = 9.sp, letterSpacing = 1.sp)
         }
-        IconButton(onClick = {}) { Icon(Icons.Default.NotificationsNone, null, tint = Color.White) }
+        IconButton(onClick = {}) { Icon(Icons.Default.NotificationsNone, null, tint = TextMain) }
+        IconButton(onClick = {}) { Icon(Icons.Default.Diamond, null, tint = Color(0xFFFFC857)) }
     }
 }
 
-@Composable
-private fun SearchBox(query: String, onQuery: (String) -> Unit) {
-    OutlinedTextField(value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-        placeholder = { Text("Search anime, character, mood...", color = Muted, fontSize = 13.sp) },
-        leadingIcon = { Icon(Icons.Default.Search, null, tint = Muted) }, singleLine = true,
-        shape = RoundedCornerShape(16.dp), colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Purple, unfocusedBorderColor = Color(0xFF292D40),
-            focusedContainerColor = Panel, unfocusedContainerColor = Panel, cursorColor = Purple,
-            focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+@Composable private fun SearchBar(value: String, onValue: (String) -> Unit) {
+    OutlinedTextField(value, onValue, Modifier.fillMaxWidth().padding(horizontal = 16.dp), placeholder = { Text("Search anime, character, style...", color = TextMuted, fontSize = 13.sp) }, leadingIcon = { Icon(Icons.Default.Search, null, tint = Purple) }, singleLine = true, shape = RoundedCornerShape(16.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple, unfocusedBorderColor = Color(0xFF302744), focusedTextColor = TextMain, unfocusedTextColor = TextMain, cursorColor = Purple))
 }
 
-@Composable
-private fun HeroBanner() {
-    Box(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 18.dp).height(172.dp)
-        .clip(RoundedCornerShape(24.dp)).background(Brush.linearGradient(listOf(Color(0xFF21174B), Color(0xFF6B3D9C), Color(0xFF172A50))))) {
-        Column(Modifier.align(Alignment.CenterStart).padding(20.dp)) {
-            Text("ANIME COLLECTION 2026", color = Color(0xFFD8C8FF), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-            Spacer(Modifier.height(8.dp))
-            Text("Make your screen\nlegendary.", color = Color.White, fontSize = 25.sp, lineHeight = 29.sp, fontWeight = FontWeight.ExtraBold)
+@Composable private fun FeaturedBanner(onExplore: () -> Unit) {
+    val infinite = rememberInfiniteTransition(label = "banner")
+    val glow by infinite.animateFloat(0.65f, 1f, infiniteRepeatable(tween(1800), RepeatMode.Reverse), label = "glow")
+    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).height(154.dp).clip(RoundedCornerShape(22.dp)).background(Brush.linearGradient(listOf(Color(0xFF35105D), Color(0xFF152D58), Color(0xFF120D21)))).border(1.dp, Purple.copy(alpha = glow), RoundedCornerShape(22.dp))) {
+        Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Purple.copy(alpha = .35f), Color.Transparent), radius = 420f)))
+        Column(Modifier.align(Alignment.CenterStart).padding(18.dp)) {
+            Text("THE ANIME UNIVERSE", color = Color(0xFFD6B8FF), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Spacer(Modifier.height(6.dp))
+            Text("Your screen.\nYour universe.", color = TextMain, fontSize = 23.sp, fontWeight = FontWeight.Black, lineHeight = 27.sp)
             Spacer(Modifier.height(10.dp))
-            Text("Discover stunning 4K worlds  →", color = Color.White.copy(alpha = .85f), fontSize = 11.sp)
+            Button(onClick = onExplore, colors = ButtonDefaults.buttonColors(containerColor = Purple), contentPadding = PaddingValues(horizontal = 15.dp, vertical = 6.dp)) { Text("Explore 4K  →", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
         }
-        Text("✦", Modifier.align(Alignment.TopEnd).padding(22.dp), color = Color(0xFFFFD98B), fontSize = 38.sp)
-        Text("✧", Modifier.align(Alignment.BottomEnd).padding(35.dp), color = Color.White, fontSize = 48.sp)
+        Icon(Icons.Default.AutoAwesome, null, Modifier.align(Alignment.TopEnd).padding(22.dp).size(42.dp), tint = Color.White.copy(alpha = .7f))
     }
 }
 
-@Composable
-private fun SectionTitle(title: String, action: String) {
-    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, Modifier.weight(1f), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-        Text(action, color = Purple, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun WallpaperRow(wallpaper: Wallpaper, onSelect: (Wallpaper) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp).clip(RoundedCornerShape(18.dp))
-        .background(Panel).clickable { onSelect(wallpaper) }.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        WallpaperArt(wallpaper, Modifier.width(94.dp).height(112.dp))
-        Column(Modifier.weight(1f).padding(start = 13.dp)) {
-            Text(wallpaper.tag, color = Purple, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-            Spacer(Modifier.height(5.dp))
-            Text(wallpaper.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(5.dp))
-            Text("4K Ultra HD  •  AMOLED", color = Muted, fontSize = 10.sp)
-            Spacer(Modifier.height(9.dp))
-            Text("Preview wallpaper  →", color = Color(0xFFD3C5FF), fontSize = 11.sp)
-        }
-        Icon(Icons.Default.ChevronRight, null, tint = Muted)
-    }
-}
-
-@Composable
-private fun WallpaperArt(w: Wallpaper, modifier: Modifier = Modifier) {
-    Box(modifier.clip(RoundedCornerShape(15.dp)).background(Brush.linearGradient(w.colors)), contentAlignment = Alignment.Center) {
-        Text("✦", Modifier.align(Alignment.TopEnd).padding(9.dp), color = Color.White.copy(alpha = .7f), fontSize = 20.sp)
-        Text("影", color = Color.White.copy(alpha = .9f), fontSize = 44.sp, fontWeight = FontWeight.Black)
-        Box(Modifier.fillMaxWidth().height(28.dp).align(Alignment.BottomCenter).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .5f)))))
-    }
-}
-
-@Composable
-private fun MotionStudioCard() {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp).clip(RoundedCornerShape(20.dp))
-        .background(Brush.linearGradient(listOf(Color(0xFF31204D), Color(0xFF172B43)))).padding(17.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.AutoAwesome, null, tint = Color(0xFFFFD98B), modifier = Modifier.size(34.dp))
-        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            Text("Motion Studio", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Text("Bring wallpapers to life with effects", color = Color.White.copy(alpha = .7f), fontSize = 10.sp)
-        }
-        Text("SOON", color = Color(0xFFFFD98B), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun ExploreScreen(padding: PaddingValues, query: String, onQuery: (String) -> Unit, onSelect: (Wallpaper) -> Unit) {
-    Column(Modifier.fillMaxSize().padding(padding)) {
-        Text("Explore", Modifier.padding(20.dp), color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-        SearchBox(query, onQuery)
-        LazyColumn(contentPadding = PaddingValues(bottom = 20.dp)) {
-            items(wallpapers.filter { query.isBlank() || it.title.contains(query, true) }) { WallpaperRow(it, onSelect) }
+@Composable private fun CategoryRow(selected: String, onSelect: (String) -> Unit) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf("All", "Action", "Fantasy", "Nature", "Cyberpunk").forEach { c ->
+            FilterChip(selected = selected == c, onClick = { onSelect(c) }, label = { Text(c, fontSize = 11.sp) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Purple.copy(alpha = .25f), selectedLabelColor = TextMain, labelColor = TextMuted), border = FilterChipDefaults.filterChipBorder(enabled = true, selected = selected == c, borderColor = Color(0xFF382C50), selectedBorderColor = Purple))
         }
     }
 }
 
-@Composable
-private fun FavoritesScreen(padding: PaddingValues, favorites: List<String>, onSelect: (String) -> Unit) {
-    Column(Modifier.fillMaxSize().padding(padding)) {
-        Text("Your Favorites", Modifier.padding(20.dp), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        if (favorites.isEmpty()) Text("Your saved wallpapers will appear here.", Modifier.padding(20.dp), color = Muted)
-        else LazyColumn { items(favorites) { name -> wallpapers.find { it.title == name }?.let { WallpaperRow(it) { onSelect(name) } } } }
+@Composable private fun WallpaperCard(w: Wallpaper, favorite: Boolean, onFavorite: () -> Unit, onClick: () -> Unit) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Surface).clickable(onClick = onClick).border(1.dp, Color(0xFF2B223C), RoundedCornerShape(18.dp))) {
+        Box(Modifier.fillMaxWidth().height(190.dp).background(Brush.linearGradient(w.colors))) {
+            WallpaperArt(w)
+            Text(w.tag, Modifier.align(Alignment.TopStart).padding(9.dp).clip(RoundedCornerShape(7.dp)).background(Color.Black.copy(alpha = .45f)).padding(horizontal = 8.dp, vertical = 4.dp), color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            IconButton(onClick = onFavorite, modifier = Modifier.align(Alignment.TopEnd).padding(5.dp).size(34.dp).background(Color.Black.copy(alpha = .4f), CircleShape)) { Icon(if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (favorite) Pink else Color.White, modifier = Modifier.size(18.dp)) }
+            Icon(Icons.Default.OpenInFull, null, Modifier.align(Alignment.BottomEnd).padding(10.dp).size(17.dp), tint = Color.White.copy(alpha = .8f))
+        }
+        Column(Modifier.padding(horizontal = 11.dp, vertical = 9.dp)) {
+            Text(w.title, color = TextMain, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(w.category.uppercase(), color = TextMuted, fontSize = 9.sp, letterSpacing = 1.sp)
+        }
     }
 }
 
-@Composable
-private fun SettingsScreen(padding: PaddingValues) {
-    Column(Modifier.fillMaxSize().padding(padding).padding(20.dp)) {
-        Text("Settings", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+@Composable private fun WallpaperArt(w: Wallpaper) {
+    Canvas(Modifier.fillMaxSize()) {
+        val w0 = size.width; val h0 = size.height
+        for (i in 0..24) {
+            val x = (i * 73f % w0); val y = (i * 47f % h0)
+            drawCircle(Color.White.copy(alpha = if (i % 3 == 0) .65f else .22f), radius = if (i % 4 == 0) 2.3f else 1.2f, center = androidx.compose.ui.geometry.Offset(x, y))
+        }
+        drawCircle(w.colors[1].copy(alpha = .38f), radius = size.minDimension * .27f, center = androidx.compose.ui.geometry.Offset(w0 * .72f, h0 * .42f))
+        val path = Path().apply { moveTo(0f, h0 * .78f); lineTo(w0 * .28f, h0 * .48f); lineTo(w0 * .52f, h0 * .78f); lineTo(w0 * .78f, h0 * .4f); lineTo(w0, h0 * .74f); lineTo(w0, h0); lineTo(0f, h0); close() }
+        drawPath(path, Brush.verticalGradient(listOf(w.colors[1].copy(alpha = .85f), Color.Black.copy(alpha = .8f))))
+    }
+}
+
+@Composable private fun WallpaperDetail(w: Wallpaper, favorite: Boolean, onFavorite: () -> Unit, onClose: () -> Unit) {
+    AlertDialog(onDismissRequest = onClose, containerColor = Surface, title = { Text(w.title, color = TextMain, fontWeight = FontWeight.Bold) }, text = {
+        Column {
+            Box(Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(18.dp)).background(Brush.linearGradient(w.colors))) { WallpaperArt(w) }
+            Spacer(Modifier.height(12.dp)); Text("${w.category}  •  ${w.tag}", color = TextMuted)
+            Text("Preview artwork is a design placeholder. Connect a licensed wallpaper source to serve real downloadable 4K images.", color = TextMuted, fontSize = 12.sp)
+        }
+    }, confirmButton = { TextButton(onClick = onFavorite) { Text(if (favorite) "Remove favorite" else "Add favorite", color = Purple) } }, dismissButton = { TextButton(onClick = onClose) { Text("Close", color = TextMuted) } })
+}
+
+@Composable private fun MotionStudio(effect: String, onEffect: (String) -> Unit) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
+        Text("MOTION STUDIO", color = TextMain, fontWeight = FontWeight.Black, fontSize = 21.sp, letterSpacing = 1.sp)
+        Text("Create animated looks for your wallpaper", color = TextMuted, fontSize = 12.sp)
         Spacer(Modifier.height(18.dp))
-        listOf("Wallpaper quality" to "Ultra HD", "Auto wallpaper changer" to "Coming soon", "Notifications" to "Enabled", "Language" to "English", "About AnimePixel Pro" to "Version 1.0.0").forEach { (a, b) ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(a, Modifier.weight(1f), color = Color.White, fontSize = 14.sp)
-                Text(b, color = Muted, fontSize = 12.sp)
-            }
-            HorizontalDivider(color = Color(0xFF25283A))
+        val infinite = rememberInfiniteTransition(label = "motion")
+        val alpha by infinite.animateFloat(.3f, .95f, infiniteRepeatable(tween(1300), RepeatMode.Reverse), label = "pulse")
+        Box(Modifier.fillMaxWidth().height(280.dp).clip(RoundedCornerShape(24.dp)).background(Brush.linearGradient(listOf(Color(0xFF271044), Color(0xFF123A65), Color(0xFF120D21)))), contentAlignment = Alignment.Center) {
+            repeat(18) { i -> Box(Modifier.offset(x = ((i * 31) % 260 - 130).dp, y = ((i * 47) % 220 - 110).dp).size((3 + i % 4).dp).background(Purple.copy(alpha = alpha), CircleShape)) }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(54.dp)); Text(effect.uppercase(), color = TextMain, fontWeight = FontWeight.Black, fontSize = 17.sp); Text("Animated effect preview", color = TextMuted, fontSize = 11.sp) }
         }
+        Spacer(Modifier.height(18.dp)); Text("EFFECT LIBRARY", color = TextMain, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        listOf("Petals", "Rain", "Snow", "Neon", "Energy", "Glitch", "3D Depth").chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                row.forEach { item -> OutlinedButton(onClick = { onEffect(item) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.outlinedButtonColors(contentColor = if (effect == item) Color.White else TextMuted), border = BorderStroke(1.dp, if (effect == item) Purple else Color(0xFF382C50))) { Text(item, fontSize = 11.sp) } }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+        Spacer(Modifier.height(18.dp)); Text("Note: this screen previews UI effects only. A real animated live-wallpaper service and export pipeline are not connected in this starter.", color = TextMuted, fontSize = 11.sp)
     }
 }
 
-@Composable
-private fun WallpaperDetail(w: Wallpaper, favorite: Boolean, onBack: () -> Unit, onFavorite: () -> Unit) {
-    Column(Modifier.fillMaxSize().background(Bg)) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = Color.White) }
-            Text("Wallpaper Preview", Modifier.weight(1f), color = Color.White, fontWeight = FontWeight.Bold)
-            IconButton(onClick = onFavorite) { Icon(if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (favorite) Color(0xFFFF5D8F) else Color.White) }
+@Composable private fun SettingsScreen(auto: Boolean, onAuto: (Boolean) -> Unit, interval: String, onInterval: (String) -> Unit) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
+        Text("SETTINGS", color = TextMain, fontWeight = FontWeight.Black, fontSize = 22.sp)
+        Text("Personalize your wallpaper experience", color = TextMuted, fontSize = 12.sp)
+        Spacer(Modifier.height(20.dp))
+        SettingRow("Auto Wallpaper Changer", "Rotate wallpapers automatically", auto, onAuto)
+        Spacer(Modifier.height(12.dp))
+        Text("CHANGE INTERVAL", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+            listOf("Every hour", "Every day", "Every week").forEach { v -> FilterChip(selected = interval == v, onClick = { onInterval(v) }, label = { Text(v, fontSize = 10.sp) }) }
         }
-        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 28.dp, vertical = 12.dp)) {
-            WallpaperArt(w, Modifier.fillMaxSize())
+        Spacer(Modifier.height(22.dp)); SettingRow("Dark Theme", "Premium dark appearance", true, {})
+        Spacer(Modifier.height(12.dp)); SettingRow("Notifications", "New wallpaper alerts", false, {})
+        Spacer(Modifier.height(24.dp))
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF211632)), shape = RoundedCornerShape(18.dp)) {
+            Column(Modifier.padding(16.dp)) { Text("GO PREMIUM", color = Color(0xFFFFD27A), fontWeight = FontWeight.Black); Text("Unlock exclusive collections and an ad-free experience.", color = TextMuted, fontSize = 12.sp); Button(onClick = {}, modifier = Modifier.padding(top = 10.dp), colors = ButtonDefaults.buttonColors(containerColor = Purple)) { Text("Explore Premium") } }
         }
-        Text(w.title, Modifier.align(Alignment.CenterHorizontally), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text("4K Ultra HD  •  AMOLED Optimized", Modifier.align(Alignment.CenterHorizontally).padding(top = 5.dp), color = Muted, fontSize = 11.sp)
-        Button(onClick = { }, Modifier.fillMaxWidth().padding(20.dp).height(52.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Purple)) {
-            Icon(Icons.Default.Wallpaper, null)
-            Spacer(Modifier.width(8.dp))
-            Text("Set Wallpaper")
-        }
+        Spacer(Modifier.height(20.dp)); Text("AnimePixel Pro • Starter UI • v1.1.0", color = TextMuted, fontSize = 10.sp)
+    }
+}
+
+@Composable private fun SettingRow(title: String, subtitle: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) { Text(title, color = TextMain, fontWeight = FontWeight.Bold, fontSize = 13.sp); Text(subtitle, color = TextMuted, fontSize = 10.sp) }
+        Switch(checked, onCheckedChange = onChecked, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Purple))
     }
 }

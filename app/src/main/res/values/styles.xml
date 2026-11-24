@@ -1,9 +1,9 @@
 <resources>
-    <style name="Theme.AnimePixelPro" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.AnimePixelPro" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:statusBarColor">#090A12</item>
-        <item name="android:navigationBarColor">#090A12</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:statusBarColor">#090711</item>
+        <item name="android:navigationBarColor">#090711</item>
+        <item name="android:windowActionModeOverlay">true</item>
     </style>
 </resources>
