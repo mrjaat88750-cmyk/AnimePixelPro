@@ -1,7 +1,13 @@
 package com.animepixel.pro
 import androidx.compose.animation.core.*
 
+import android.app.WallpaperManager
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
+import com.animepixel.pro.wallpaper.VideoWallpaperService
 import android.os.Bundle
 import android.widget.VideoView
 import androidx.activity.ComponentActivity
@@ -80,6 +86,7 @@ private fun AnimePixelApp() {
     var autoChange by remember { mutableStateOf(false) }
     var interval by remember { mutableStateOf("Every day") }
     var selectedEffect by remember { mutableStateOf("Petals") }
+    val context = LocalContext.current
     val filtered = wallpapers.filter { w ->
         (tab != "Favorites" || w.id in favorites) &&
             (category == "All" || w.category == category) &&
@@ -122,7 +129,34 @@ private fun AnimePixelApp() {
                 }
             }
             selected?.let { w ->
-                WallpaperDetail(w, w.id in favorites, { favorites = if (w.id in favorites) favorites - w.id else favorites + w.id }, { selected = null })
+                WallpaperDetail(
+                    w,
+                    w.id in favorites,
+                    { favorites = if (w.id in favorites) favorites - w.id else favorites + w.id },
+                    {
+                        val videoRes = w.videoRes
+                        if (videoRes != null) {
+                            context.getSharedPreferences("wallpaper_prefs", Context.MODE_PRIVATE)
+                                .edit()
+                                .putInt("selected_video_res", videoRes)
+                                .apply()
+
+                            val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
+                                putExtra(
+                                    WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                                    ComponentName(context, VideoWallpaperService::class.java)
+                                )
+                            }
+
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Live Wallpaper preview is not available on this device.", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    { selected = null }
+                )
             }
         }
     }
@@ -220,7 +254,7 @@ private fun AnimePixelApp() {
     AndroidView(factory = { videoView }, modifier = modifier)
 }
 
-@Composable private fun WallpaperDetail(w: Wallpaper, favorite: Boolean, onFavorite: () -> Unit, onClose: () -> Unit) {
+@Composable private fun WallpaperDetail(w: Wallpaper, favorite: Boolean, onFavorite: () -> Unit, onApply: () -> Unit, onClose: () -> Unit) {
     AlertDialog(onDismissRequest = onClose, containerColor = Surface, title = { Text(w.title, color = TextMain, fontWeight = FontWeight.Bold) }, text = {
         Column {
             if (w.videoRes != null) {
@@ -232,7 +266,25 @@ private fun AnimePixelApp() {
             Text(if (w.videoRes != null) "${w.category}  •  LOOPING VIDEO PREVIEW" else "${w.category}  •  ${w.tag}", color = TextMuted)
             Text(if (w.videoRes != null) "Your uploaded wolf animation is playing in a silent loop. Tap Close to stop playback." else "Preview artwork is a design placeholder. Connect a licensed wallpaper source to serve real downloadable 4K images.", color = TextMuted, fontSize = 12.sp)
         }
-    }, confirmButton = { TextButton(onClick = onFavorite) { Text(if (favorite) "Remove favorite" else "Add favorite", color = Purple) } }, dismissButton = { TextButton(onClick = onClose) { Text("Close", color = TextMuted) } })
+    }, confirmButton = {
+        Column(horizontalAlignment = Alignment.End) {
+            if (w.videoRes != null) {
+                Button(
+                    onClick = onApply,
+                    colors = ButtonDefaults.buttonColors(containerColor = Purple)
+                ) {
+                    Text("Set Live Wallpaper")
+                }
+            }
+            TextButton(onClick = onFavorite) {
+                Text(if (favorite) "Remove favorite" else "Add favorite", color = Purple)
+            }
+        }
+    }, dismissButton = {
+        TextButton(onClick = onClose) {
+            Text("Close", color = TextMuted)
+        }
+    })
 }
 
 @Composable private fun MotionStudio(effect: String, onEffect: (String) -> Unit) {
